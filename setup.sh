@@ -167,8 +167,13 @@ echo ""
 # Step 5: Create project + sync
 # ---------------------------------------------------------------------------
 echo "[5/5] Creating project and triggering first sync..."
+CONN_SPEC="github:1"
+if [[ -n "$ORG" ]]; then
+    CONN_SPEC="github:1,gh-copilot:1"
+fi
 gh devlake configure project add \
-    --project-name "$PROJECT_NAME"
+    --project-name "$PROJECT_NAME" \
+    --connections "$CONN_SPEC"
 
 echo ""
 echo "===  Setup Complete  ==="

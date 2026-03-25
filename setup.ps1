@@ -206,8 +206,13 @@ Write-Host ""
 # ---------------------------------------------------------------------------
 
 Write-Host "[5/5] Creating project and triggering first sync..." -ForegroundColor Cyan
+$connSpec = "github:1"
+if ($Org) {
+    $connSpec = "github:1,gh-copilot:1"
+}
 gh devlake configure project add `
-    --project-name $ProjectName
+    --project-name $ProjectName `
+    --connections $connSpec
 
 Write-Host ""
 Write-Host "===  Setup Complete  ===" -ForegroundColor Green
