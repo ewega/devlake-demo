@@ -1,0 +1,115 @@
+name: Keep Alive — DORA Signal Generator
+
+on:
+  schedule:
+    # Every Tuesday and Thursday at 14:00 UTC
+    - cron: "0 14 * * 2,4"
+  workflow_dispatch:
+    inputs:
+      force_incident:
+        description: "Force an incident issue?"
+        required: false
+        type: boolean
+        default: false
+      force_failure:
+        description: "Force a failed deployment?"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  generate-signals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "devlake-bot"
+          git config user.email "devlake-bot@users.noreply.github.com"
+
+      # ---------------------------------------------------------------
+      # 1. Feature PR (every run → deployment frequency + lead time)
+      # ---------------------------------------------------------------
+      - name: Create feature branch and PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="feature/keep-alive-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+
+          # Append a timestamped entry to the activity log
+          mkdir -p activity
+          echo "<!-- keep-alive: $(date -u +%Y-%m-%dT%H:%M:%SZ) -->" >> activity/log.md
+
+          git add activity/log.md
+          git commit -m "chore: keep-alive signal $(date +%Y-%m-%d)"
+          git push origin "$BRANCH"
+
+          PR_URL=$(gh pr create \
+            --title "chore: keep-alive $(date +%Y-%m-%d)" \
+            --body "Automated keep-alive PR for DORA signal generation." \
+            --base main \
+            --head "$BRANCH")
+
+          echo "Created PR: $PR_URL"
+          sleep 10
+
+          PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+          gh pr merge "$PR_NUMBER" --merge --delete-branch
+          echo "Merged PR #$PR_NUMBER"
+
+      # ---------------------------------------------------------------
+      # 2. Incident issue (~20% chance or forced)
+      # ---------------------------------------------------------------
+      - name: Maybe create incident
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FORCE="${{ github.event.inputs.force_incident }}"
+          ROLL=$((RANDOM % 100))
+
+          if [ "$FORCE" = "true" ] || [ $ROLL -lt 20 ]; then
+            echo "Creating incident issue..."
+            gh label create incident --color d73a4a --description "Production incidents" 2>/dev/null || true
+
+            ISSUE_URL=$(gh issue create \
+              --title "Incident: elevated error rate $(date +%Y-%m-%d)" \
+              --body "Automated incident for DORA MTTR signal generation. Created at $(date -u)." \
+              --label "incident")
+
+            ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -o '[0-9]*$')
+            echo "Created incident #$ISSUE_NUMBER"
+
+            # Resolve after a short delay (simulates quick MTTR)
+            sleep 30
+            gh issue close "$ISSUE_NUMBER" \
+              --comment "Resolved: root cause identified and mitigated."
+            echo "Resolved incident #$ISSUE_NUMBER"
+          else
+            echo "No incident this run (roll=$ROLL, threshold=20)"
+          fi
+
+      # ---------------------------------------------------------------
+      # 3. Failed deployment (~15% chance or forced)
+      # ---------------------------------------------------------------
+      - name: Maybe trigger failed deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FORCE="${{ github.event.inputs.force_failure }}"
+          ROLL=$((RANDOM % 100))
+
+          if [ "$FORCE" = "true" ] || [ $ROLL -lt 15 ]; then
+            echo "Triggering failed deployment..."
+            gh workflow run "Production Deploy" -f simulate_failure=true || echo "Could not trigger workflow"
+          else
+            echo "No failure this run (roll=$ROLL, threshold=15)"
+          fi

@@ -1,0 +1,23 @@
+{
+  "name": "DevLake Demo",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "gh extension install DevExpGBB/gh-devlake 2>/dev/null || true",
+  "postStartCommand": "echo '\\n  Run: cp .env.example .env && edit .env && ./setup.sh\\n'",
+  "forwardPorts": [3002, 4000, 8080],
+  "portsAttributes": {
+    "3002": { "label": "Grafana", "onAutoForward": "notify" },
+    "4000": { "label": "Config UI", "onAutoForward": "notify" },
+    "8080": { "label": "DevLake API", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}

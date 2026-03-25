@@ -1,0 +1,70 @@
+services:
+  mysql:
+    image: mysql:8
+    volumes:
+      - mysql-storage:/var/lib/mysql
+    restart: always
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: lake
+      MYSQL_USER: merico
+      MYSQL_PASSWORD: merico
+      TZ: UTC
+    command: >-
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_bin
+      --skip-log-bin
+
+  grafana:
+    image: ${IMAGE_REPO:-apache}/devlake-dashboard:${IMAGE_TAG:-latest}
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    environment:
+      GF_SERVER_ROOT_URL: "http://localhost:${CONFIG_UI_PORT:-4000}/grafana"
+      GF_USERS_DEFAULT_THEME: "light"
+      MYSQL_URL: mysql:3306
+      MYSQL_DATABASE: lake
+      MYSQL_USER: merico
+      MYSQL_PASSWORD: merico
+      TZ: UTC
+    restart: always
+    depends_on:
+      - mysql
+
+  devlake:
+    image: ${IMAGE_REPO:-apache}/devlake:${IMAGE_TAG:-latest}
+    ports:
+      - "${DEVLAKE_PORT:-8080}:8080"
+    restart: always
+    volumes:
+      - devlake-log:/app/logs
+    env_file:
+      - ./.env
+    environment:
+      LOGGING_DIR: /app/logs
+      TZ: UTC
+      FORCE_MIGRATION: "true"
+    depends_on:
+      - mysql
+
+  config-ui:
+    image: ${IMAGE_REPO:-apache}/devlake-config-ui:${IMAGE_TAG:-latest}
+    ports:
+      - "${CONFIG_UI_PORT:-4000}:4000"
+    env_file:
+      - ./.env
+    environment:
+      DEVLAKE_ENDPOINT: devlake:8080
+      GRAFANA_ENDPOINT: grafana:3000
+      TZ: UTC
+    depends_on:
+      - devlake
+
+volumes:
+  mysql-storage:
+  grafana-storage:
+  devlake-log:

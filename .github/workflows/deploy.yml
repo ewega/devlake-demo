@@ -1,0 +1,27 @@
+name: Production Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Simulate a deployment failure?"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        run: |
+          echo "Deploying to production..."
+          if [ "${{ github.event.inputs.simulate_failure }}" = "true" ]; then
+            echo "Simulated deployment failure!"
+            exit 1
+          fi
+          echo "Deployment successful."
